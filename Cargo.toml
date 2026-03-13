@@ -1,0 +1,19 @@
+[package]
+name = "nestor-replay"
+version = "0.1.0"
+edition = "2021"
+description = "Replay CAN recordings from CyphalCloud/Nestor server to SocketCAN"
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
+tokio = { version = "1", features = ["full"] }
+socketcan = "3.3"
+dialoguer = "0.11"
+indicatif = "0.17"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+urlencoding = "2.1"
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
