@@ -20,7 +20,7 @@ struct Args {
 
     /// Boot ID (skip interactive selection)
     #[arg(short, long)]
-    boot: Option<i64>,
+    boot: Option<u64>,
 
     /// SocketCAN interface
     #[arg(short, long, default_value = "vcan0")]
@@ -55,7 +55,7 @@ struct BootsResponse {
 
 #[derive(Debug, Deserialize)]
 struct BootDTO {
-    boot_id: i64,
+    boot_id: u64,
     first_record: CANFrameRecordDTO,
     last_record: CANFrameRecordDTO,
 }
@@ -70,7 +70,7 @@ struct RecordsResponse {
 #[derive(Debug, Deserialize, Clone)]
 struct CANFrameRecordDTO {
     hw_ts_us: i64,
-    boot_id: i64,
+    boot_id: u64,
     seqno: i64,
     commit_ts: i64,
     frame: CANFrameDTO,
