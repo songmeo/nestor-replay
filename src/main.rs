@@ -3,7 +3,7 @@ use clap::Parser;
 use dialoguer::{theme::ColorfulTheme, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
-use socketcan::{CanSocket, EmbeddedFrame, Frame, Socket, StandardId, ExtendedId};
+use socketcan::{CanSocket, EmbeddedFrame, ExtendedId, Frame, Socket, StandardId};
 use std::time::{Duration, Instant};
 
 /// Replay CAN recordings from CyphalCloud/Nestor server
@@ -118,7 +118,13 @@ fn main() -> Result<()> {
         let items: Vec<String> = devices
             .devices
             .iter()
-            .map(|d| format!("{} (last seen: {})", d.device, format_timestamp(d.last_heard_ts)))
+            .map(|d| {
+                format!(
+                    "{} (last seen: {})",
+                    d.device,
+                    format_timestamp(d.last_heard_ts)
+                )
+            })
             .collect();
 
         let selection = Select::with_theme(&theme)
@@ -160,7 +166,10 @@ fn main() -> Result<()> {
                 let first_ts = format_timestamp(b.first_record.commit_ts);
                 let last_ts = format_timestamp(b.last_record.commit_ts);
                 let frames = b.last_record.seqno - b.first_record.seqno + 1;
-                format!("Boot #{} ({} to {}, {} frames)", b.boot_id, first_ts, last_ts, frames)
+                format!(
+                    "Boot #{} ({} to {}, {} frames)",
+                    b.boot_id, first_ts, last_ts, frames
+                )
             })
             .collect();
 
@@ -272,7 +281,8 @@ fn main() -> Result<()> {
                 let id = ExtendedId::new(record.frame.can_id).context("Invalid extended CAN ID")?;
                 socketcan::CanDataFrame::new(id, &data).context("Failed to create CAN frame")?
             } else {
-                let id = StandardId::new(record.frame.can_id as u16).context("Invalid standard CAN ID")?;
+                let id = StandardId::new(record.frame.can_id as u16)
+                    .context("Invalid standard CAN ID")?;
                 socketcan::CanDataFrame::new(id, &data).context("Failed to create CAN frame")?
             };
             sock.write_frame(&frame).context("Failed to send frame")?;
