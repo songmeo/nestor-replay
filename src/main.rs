@@ -357,14 +357,16 @@ fn main() -> Result<()> {
         pb.finish_with_message("Done!");
     }
 
-    if out.enabled {
-        let total_time = start_time.elapsed();
-        println!(
-            "\nReplayed {} frames in {:.1}s",
-            frames_sent,
-            total_time.as_secs_f64()
-        );
-    }
+    let total_time = start_time.elapsed();
+
+    // In dry-run, stdout already contains frame-by-frame output, so also print a summary.
+    // In non-dry-run, remain silent during replay, but print a single final summary line.
+    println!(
+        "Replayed {} frames in {:.1}s{}",
+        frames_sent,
+        total_time.as_secs_f64(),
+        if args.dry_run { " (dry run)" } else { "" }
+    );
 
     Ok(())
 }
