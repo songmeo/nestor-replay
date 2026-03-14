@@ -6,6 +6,43 @@ use serde::Deserialize;
 use socketcan::{CanSocket, EmbeddedFrame, ExtendedId, Frame, Socket, StandardId};
 use std::time::{Duration, Instant};
 
+struct Output {
+    enabled: bool,
+}
+
+impl Output {
+    fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
+
+    fn println(&self, msg: impl AsRef<str>) {
+        if self.enabled {
+            println!("{}", msg.as_ref());
+        }
+    }
+
+    fn printf(&self, args: std::fmt::Arguments<'_>) {
+        if self.enabled {
+            println!("{}", args);
+        }
+    }
+
+    fn progress_bar(&self, len: u64) -> Option<ProgressBar> {
+        if !self.enabled {
+            return None;
+        }
+
+        let pb = ProgressBar::new(len);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} frames ({eta})")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+        Some(pb)
+    }
+}
+
 /// Replay CAN recordings from CyphalCloud/Nestor server
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -93,10 +130,11 @@ fn format_timestamp(ts: i64) -> String {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    let out = Output::new(args.dry_run);
     let client = reqwest::blocking::Client::new();
     let theme = ColorfulTheme::default();
 
-    println!("Connecting to {}...\n", args.server);
+    out.printf(format_args!("Connecting to {}...\n", args.server));
 
     // Get devices
     let devices: DevicesResponse = client
@@ -107,7 +145,7 @@ fn main() -> Result<()> {
         .context("Failed to parse devices response")?;
 
     if devices.devices.is_empty() {
-        println!("No devices found on server.");
+        out.println("No devices found on server.");
         return Ok(());
     }
 
@@ -136,7 +174,7 @@ fn main() -> Result<()> {
         devices.devices[selection].device.clone()
     };
 
-    println!("Selected device: {}\n", device_name);
+    out.printf(format_args!("Selected device: {}\n", device_name));
 
     // Get boots
     let boots: BootsResponse = client
@@ -151,7 +189,10 @@ fn main() -> Result<()> {
         .context("Failed to parse boots response")?;
 
     if boots.boots.is_empty() {
-        println!("No boot sessions found for device '{}'.", device_name);
+        out.printf(format_args!(
+            "No boot sessions found for device '{}'.",
+            device_name
+        ));
         return Ok(());
     }
 
@@ -182,10 +223,10 @@ fn main() -> Result<()> {
         boots.boots[selection].boot_id
     };
 
-    println!("Selected boot: #{}\n", boot_id);
+    out.printf(format_args!("Selected boot: #{}\n", boot_id));
 
     // Fetch all records (paginated)
-    println!("Fetching records...");
+    out.println("Fetching records...");
     let mut all_records: Vec<CANFrameRecordDTO> = Vec::new();
     let mut seqno_min: Option<i64> = None;
 
@@ -214,7 +255,11 @@ fn main() -> Result<()> {
 
         let last_seqno = response.records.last().map(|r| r.seqno).unwrap_or(0);
         all_records.extend(response.records);
-        println!("  Fetched {} records (total: {})", count, all_records.len());
+        out.printf(format_args!(
+            "  Fetched {} records (total: {})",
+            count,
+            all_records.len()
+        ));
 
         if count < 10000 {
             break;
@@ -223,20 +268,20 @@ fn main() -> Result<()> {
     }
 
     if all_records.is_empty() {
-        println!("No records found for boot #{}.", boot_id);
+        out.printf(format_args!("No records found for boot #{}.", boot_id));
         return Ok(());
     }
 
     // Sort by hardware timestamp
     all_records.sort_by_key(|r| r.hw_ts_us);
 
-    println!(
+    out.printf(format_args!(
         "\nReplaying {} frames to {} at {:.1}x speed{}...\n",
         all_records.len(),
         args.interface,
         args.speed,
         if args.dry_run { " (dry run)" } else { "" }
-    );
+    ));
 
     // Open SocketCAN interface
     let socket = if !args.dry_run {
@@ -248,14 +293,8 @@ fn main() -> Result<()> {
         None
     };
 
-    // Progress bar
-    let pb = ProgressBar::new(all_records.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} frames ({eta})")
-            .unwrap()
-            .progress_chars("#>-"),
-    );
+    // Progress bar (only in dry-run; non-dry-run should avoid stdout work)
+    let pb = out.progress_bar(all_records.len() as u64);
 
     let start_time = Instant::now();
     let mut prev_hw_ts: Option<i64> = None;
@@ -288,36 +327,44 @@ fn main() -> Result<()> {
             sock.write_frame(&frame).context("Failed to send frame")?;
         }
 
-        // Print candump-style output
-        let elapsed = start_time.elapsed().as_secs_f64();
-        let id_str = if record.frame.extended {
-            format!("{:08X}", record.frame.can_id)
-        } else {
-            format!("{:03X}", record.frame.can_id)
-        };
-        let data_str: Vec<String> = data.iter().map(|b| format!("{:02X}", b)).collect();
+        if out.enabled {
+            // Print candump-style output
+            let elapsed = start_time.elapsed().as_secs_f64();
+            let id_str = if record.frame.extended {
+                format!("{:08X}", record.frame.can_id)
+            } else {
+                format!("{:03X}", record.frame.can_id)
+            };
+            let data_str: Vec<String> = data.iter().map(|b| format!("{:02X}", b)).collect();
 
-        println!(
-            "[{:8.3}s] {}  {} [{}]  {}",
-            elapsed,
-            args.interface,
-            id_str,
-            data.len(),
-            data_str.join(" ")
-        );
+            println!(
+                "[{:8.3}s] {}  {} [{}]  {}",
+                elapsed,
+                args.interface,
+                id_str,
+                data.len(),
+                data_str.join(" ")
+            );
+        }
 
         frames_sent += 1;
-        pb.set_position(frames_sent);
+        if let Some(ref pb) = pb {
+            pb.set_position(frames_sent);
+        }
     }
 
-    pb.finish_with_message("Done!");
+    if let Some(pb) = pb {
+        pb.finish_with_message("Done!");
+    }
 
-    let total_time = start_time.elapsed();
-    println!(
-        "\nReplayed {} frames in {:.1}s",
-        frames_sent,
-        total_time.as_secs_f64()
-    );
+    if out.enabled {
+        let total_time = start_time.elapsed();
+        println!(
+            "\nReplayed {} frames in {:.1}s",
+            frames_sent,
+            total_time.as_secs_f64()
+        );
+    }
 
     Ok(())
 }
