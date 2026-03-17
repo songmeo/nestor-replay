@@ -6,6 +6,8 @@ use serde::Deserialize;
 use socketcan::{CanSocket, EmbeddedFrame, ExtendedId, Frame, Socket, StandardId};
 use std::time::{Duration, Instant};
 
+mod gui;
+
 struct Output {
     enabled: bool,
 }
@@ -70,6 +72,10 @@ struct Args {
     /// Don't send to CAN, just display
     #[arg(long)]
     dry_run: bool,
+
+    /// Show GUI with graphs instead of CLI replay
+    #[arg(long)]
+    gui: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,21 +111,21 @@ struct RecordsResponse {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct CANFrameRecordDTO {
-    hw_ts_us: i64,
-    boot_id: u64,
-    seqno: i64,
-    commit_ts: i64,
-    frame: CANFrameDTO,
+pub struct CANFrameRecordDTO {
+    pub hw_ts_us: i64,
+    pub boot_id: u64,
+    pub seqno: i64,
+    pub commit_ts: i64,
+    pub frame: CANFrameDTO,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct CANFrameDTO {
-    can_id: u32,
-    extended: bool,
-    rtr: bool,
-    error: bool,
-    data_hex: String,
+pub struct CANFrameDTO {
+    pub can_id: u32,
+    pub extended: bool,
+    pub rtr: bool,
+    pub error: bool,
+    pub data_hex: String,
 }
 
 fn format_timestamp(ts: i64) -> String {
@@ -274,6 +280,12 @@ fn main() -> Result<()> {
 
     // Sort by hardware timestamp
     all_records.sort_by_key(|r| r.hw_ts_us);
+
+    // GUI mode
+    if args.gui {
+        println!("\nLaunching GUI with {} frames...", all_records.len());
+        return gui::run_gui(all_records);
+    }
 
     out.printf(format_args!(
         "\nReplaying {} frames to {} at {:.1}x speed{}...\n",
