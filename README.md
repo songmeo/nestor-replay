@@ -1,6 +1,8 @@
 # nestor-replay
 
-Replay CAN bus recordings from [CyphalCloud](https://cyphalcloud.zubax.com) to SocketCAN.
+Replay CAN bus recordings from [CyphalCloud](https://cyphalcloud.zubax.com) to SocketCAN (e.g. `vcan0`, `can0`).
+
+By default (non-`--dry-run`), the tool avoids printing during replay to preserve timing and only prints a final summary line. Use `--dry-run` to print frames to stdout in a candump-style format.
 
 ## Installation
 
@@ -9,6 +11,16 @@ cargo build --release
 ```
 
 Binary at `target/release/nestor-replay`.
+
+## Requirements
+
+Linux with SocketCAN. For testing with virtual CAN:
+
+```bash
+sudo modprobe vcan
+sudo ip link add dev vcan0 type vcan
+sudo ip link set up vcan0
+```
 
 ## Usage
 
@@ -45,7 +57,17 @@ nestor-replay --server http://localhost:8000 --device my-device --boot 0
 
 ## Output
 
-Frames displayed in candump-style format:
+### Non-dry-run (default)
+
+To preserve replay timing, `nestor-replay` stays silent during replay and prints only a final summary line:
+
+```
+Replayed 10 frames in 0.2s
+```
+
+### Dry-run (`--dry-run`)
+
+In `--dry-run` mode, frames are printed in a candump-style format (and a progress bar may be shown):
 
 ```
 [   0.000s] vcan0  5A0 [8]  10 11 12 13 14 15 16 17
@@ -53,15 +75,15 @@ Frames displayed in candump-style format:
 [   0.002s] vcan0  5A2 [8]  12 13 14 15 16 17 18 19
 ```
 
-## Requirements
+## CAN visualization (live, terminal)
 
-Linux with SocketCAN. For testing with virtual CAN:
+This repo includes a terminal visualizer:
 
-```bash
-sudo modprobe vcan
-sudo ip link add dev vcan0 type vcan
-sudo ip link set up vcan0
-```
+- `cargo run --bin can_viz -- --interface vcan0`
+
+It listens on a SocketCAN interface (like `vcan0`) and shows a live per-ID table (rates, last payload, history).
+
+
 
 ## License
 

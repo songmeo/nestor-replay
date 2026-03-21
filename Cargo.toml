@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "Replay CAN recordings from CyphalCloud/Nestor server to SocketCAN"
 
+[[bin]]
+name = "can_viz"
+path = "scripts/can_viz.rs"
+
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
 tokio = { version = "1", features = ["full"] }

@@ -1,0 +1,10 @@
+# Python dependencies for scripts under scripts/
+#
+# Install:
+#   python3 -m venv .venv
+#   . .venv/bin/activate
+#   pip install -r scripts/requirements.txt
+
+python-can>=4.3.0,<4.5
+dronecan>=1.0.25
+matplotlib>=3.7.0
